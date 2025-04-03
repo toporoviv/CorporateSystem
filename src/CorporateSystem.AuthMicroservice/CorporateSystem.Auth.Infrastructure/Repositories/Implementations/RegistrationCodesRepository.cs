@@ -1,15 +1,14 @@
-﻿using CorporateSystem.Auth.Infrastructure.Options;
+﻿using System.Net;
+using CorporateSystem.Auth.Domain.Exceptions;
 using CorporateSystem.Auth.Infrastructure.Repositories.Interfaces;
-using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using StackExchange.Redis;
 
 namespace CorporateSystem.Auth.Infrastructure.Repositories.Implementations;
 
 internal class RegistrationCodesRepository(
     IConnectionMultiplexer redis,
-    ILogger<IRegistrationCodesRepository> logger)
+    ILogger<RegistrationCodesRepository> logger)
     : IRegistrationCodesRepository
 {
     private readonly IDatabase _database = redis.GetDatabase();
@@ -29,7 +28,10 @@ internal class RegistrationCodesRepository(
             return null;
 
         if (!int.TryParse(value, out var result))
-            throw new Exception($"Не удается преобразовать {value} в int");
+        {
+            logger.LogError($"Не удается преобразовать {value} в int");
+            throw new ExceptionWithStatusCode("Что-то пошло не так", HttpStatusCode.BadRequest);
+        }
 
         return result;
     }

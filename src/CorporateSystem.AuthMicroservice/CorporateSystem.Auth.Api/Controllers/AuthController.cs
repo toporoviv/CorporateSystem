@@ -1,19 +1,18 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
-using System.Runtime.CompilerServices;
-using System.Security.Claims;
 using CorporateSystem.Auth.Api.Dtos.Auth;
-using CorporateSystem.Auth.Domain.Enums;
+using CorporateSystem.Auth.Domain.Exceptions;
 using CorporateSystem.Auth.Services.Services.Interfaces;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CorporateSystem.Auth.Api.Controllers;
 
 [ApiController]
 [Route("api/auth")]
-public class AuthController : ControllerBase
+public class AuthController(ILogger<AuthController> logger) : ControllerBase
 {
     [HttpPost("sign-in")]
-    public async Task<ActionResult<AuthResponse>> SignIn(
+    public async Task<IActionResult> SignIn(
         [FromBody]AuthRequest request,
         [FromServices] IAuthService authService)
     {
@@ -22,18 +21,20 @@ public class AuthController : ControllerBase
             var token = await authService
                 .AuthenticateAsync(new AuthUserDto(request.Email, request.Password));
             
-            return new JsonResult(new AuthResponse
+            return Ok(new AuthResponse
             {
                 Token = token
             });
         }
-        catch (UnauthorizedAccessException)
+        catch (ExceptionWithStatusCode e)
         {
-            return Unauthorized("Неверный логин или пароль");
+            logger.LogError(e.Message);
+            return StatusCode((int)e.StatusCode, e.Message);
         }
-        catch (Exception)
+        catch (Exception e)
         {
-            return Problem("Что то пошло не так");
+            logger.LogError(e.Message);
+            return StatusCode(StatusCodes.Status400BadRequest, "Что-то пошло не так");
         }
     }
     
@@ -47,12 +48,18 @@ public class AuthController : ControllerBase
             await registrationService
                 .RegisterAsync(
                     new RegisterUserDto(request.Email, request.Password, request.RepeatedPassword));
-            
-            return Ok("Регистрация прошла успешно");
+
+            return Ok();
+        }
+        catch (ExceptionWithStatusCode e)
+        {
+            logger.LogError(e.Message);
+            return StatusCode((int)e.StatusCode, e.Message);
         }
         catch (Exception ex)
         {
-            return BadRequest(ex.Message);
+            logger.LogError(ex.Message);
+            return StatusCode(StatusCodes.Status400BadRequest, "Что-то пошло не так");
         }
     }
 
@@ -65,38 +72,50 @@ public class AuthController : ControllerBase
         {
             if (request is null)
                 throw new Exception("Некорректный запрос");
-            
+
             await registrationService
                 .SuccessRegisterAsync(new SuccessRegisterUserDto(request.Email, request.Password, request.SuccessCode));
 
             return Ok();
         }
+        catch (ExceptionWithStatusCode e)
+        {
+            logger.LogError(e.Message);
+            return StatusCode((int)e.StatusCode, e.Message);
+        }
         catch (Exception e)
         {
-            return BadRequest(e.Message);
+            logger.LogError(e.Message);
+            return StatusCode(StatusCodes.Status400BadRequest, "Что-то пошло не так");
         }
     }
     
     [HttpPost("validate-token")]
-    public ActionResult<UserInfo> ValidateToken(
+    public IActionResult ValidateToken(
         [FromBody]TokenValidationRequest request, 
         [FromServices] IAuthService authService)
     {
         try
         {
             var isValid = authService.ValidateToken(request.Token);
-
+            
             if (!isValid)
             {
                 return Unauthorized("Invalid token.");
             }
-            
+
             var userInfo = GetUserInfoByToken(request.Token);
             return Ok(userInfo);
         }
+        catch (ExceptionWithStatusCode e)
+        {
+            logger.LogError(e.Message);
+            return StatusCode((int)e.StatusCode, e.Message);
+        }
         catch (Exception e)
         {
-            return Unauthorized($"Token validation failed. {e.Message}");
+            logger.LogError(e.Message);
+            return StatusCode(StatusCodes.Status401Unauthorized, "Token validation failed.");
         }
     }
     

@@ -2,6 +2,8 @@
 using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using CorporateSystem.Auth.Api.Dtos.Auth;
 using CorporateSystem.Auth.Domain.Enums;
 using CorporateSystem.Auth.Infrastructure;
@@ -54,13 +56,8 @@ public class AuthControllerTests : IClassFixture<WebApplicationFactory<Program>>
         
         var client = _factory.WithWebHostBuilder(builder =>
         {
-            builder.ConfigureTestServices(services =>
+            builder.ConfigureServices(services =>
             {
-                services.Configure<JwtToken>(options =>
-                {
-                    options.JwtSecret = testSecretKey;
-                });
-                
                 services.AddSingleton(_mockAuthService.Object);
             });
         }).CreateClient();

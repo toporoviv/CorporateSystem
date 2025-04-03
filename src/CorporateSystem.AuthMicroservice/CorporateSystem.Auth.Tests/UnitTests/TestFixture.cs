@@ -29,12 +29,12 @@ public class TestFixture : IDisposable
         serviceCollection.Configure<JwtToken>(configuration.GetSection("JwtToken"));
         serviceCollection.AddDbContext<DataContext>(options =>
             options.UseInMemoryDatabase("TestDb"));
-
-        // todo: нужно в будущем поправить grpcUrlConnection
+        
         serviceCollection
             .AddAuthInfrastructure()
             .AddAuthServices()
-            .AddScoped<IDistributedCache, FakeRedisCache>();
+            .AddScoped<IDistributedCache, FakeRedisCache>()
+            .AddLogging();
         
         return serviceCollection.BuildServiceProvider();
     }

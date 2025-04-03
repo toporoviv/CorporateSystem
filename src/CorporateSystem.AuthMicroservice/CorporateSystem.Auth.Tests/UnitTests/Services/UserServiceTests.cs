@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using AutoFixture.Xunit2;
 using CorporateSystem.Auth.Domain.Enums;
+using CorporateSystem.Auth.Domain.Exceptions;
 using CorporateSystem.Auth.Infrastructure;
 using CorporateSystem.Auth.Infrastructure.Repositories.Interfaces;
 using CorporateSystem.Auth.Services.Options;
@@ -59,7 +60,7 @@ public class UserServiceTests : IClassFixture<TestFixture>
     }
 
     [Theory, AutoData]
-    public async Task SuccessRegisterAsync_ValidInput_InvalidSuccessCode_ShouldThrowException(int successCode)
+    public async Task SuccessRegisterAsync_ValidInput_InvalidSuccessCode_ShouldThrowExceptionWithStatusCode(int successCode)
     {
         // Act
         using var testFixture = new TestFixture();
@@ -79,7 +80,7 @@ public class UserServiceTests : IClassFixture<TestFixture>
             null,
             testFixture.GetService<IOptions<JwtToken>>(),
             new OptionsWrapper<NotificationOptions>(null),
-            null);
+            new LoggerFactory().CreateLogger<UserService>());
         
         var email = "test@bobr.ru";
         var password = "password";
@@ -87,7 +88,7 @@ public class UserServiceTests : IClassFixture<TestFixture>
         var request = new SuccessRegisterUserDto(email, password, successCode);
         // Assert
 
-        await Assert.ThrowsAsync<Exception>(async () =>
+        await Assert.ThrowsAsync<ExceptionWithStatusCode>(async () =>
         {
             await userService.SuccessRegisterAsync(request);
         });
@@ -126,7 +127,7 @@ public class UserServiceTests : IClassFixture<TestFixture>
     }
 
     [Fact]
-    public async Task AuthenticateAsync_InvalidPassword_UserExists_ShouldThrowUnauthorizedAccessException()
+    public async Task AuthenticateAsync_InvalidPassword_UserExists_ShouldThrowExceptionWithStatusCodeUnauthorized()
     {
         // Act
         using var testFixture = new TestFixture();
@@ -154,7 +155,7 @@ public class UserServiceTests : IClassFixture<TestFixture>
             null);
         
         // Assert
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
+        await Assert.ThrowsAsync<ExceptionWithStatusCode>(async () =>
         {
             var authUserDtoWithInvalidPassword = new AuthUserDto(email, invalidPassword);
 
@@ -163,7 +164,7 @@ public class UserServiceTests : IClassFixture<TestFixture>
     }
     
     [Fact]
-    public async Task AuthenticateAsync_UserNotExists_ShouldThrowUnauthorizedAccessException()
+    public async Task AuthenticateAsync_UserNotExists_ShouldThrowExceptionWithStatusCodeUnauthorized()
     {
         // Act
         using var testFixture = new TestFixture();
@@ -183,7 +184,7 @@ public class UserServiceTests : IClassFixture<TestFixture>
             null);
         
         // Assert
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(async () =>
+        await Assert.ThrowsAsync<ExceptionWithStatusCode>(async () =>
         {
             var authUserDtoWithInvalidPassword = new AuthUserDto(email, password);
 

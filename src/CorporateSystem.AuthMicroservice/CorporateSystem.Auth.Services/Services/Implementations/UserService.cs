@@ -1,17 +1,17 @@
-﻿using System.Diagnostics;
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
+using System.Net;
 using System.Runtime.CompilerServices;
 using System.Security.Claims;
 using System.Text;
-using System.Transactions;
 using CorporateSystem.Auth.Domain.Entities;
 using CorporateSystem.Auth.Domain.Enums;
+using CorporateSystem.Auth.Domain.Exceptions;
 using CorporateSystem.Auth.Infrastructure.Repositories.Interfaces;
+using CorporateSystem.Auth.Services.Extensions;
 using CorporateSystem.Auth.Services.Options;
 using CorporateSystem.Auth.Services.Services.GrpcServices;
 using CorporateSystem.Auth.Services.Services.Interfaces;
 using Grpc;
-using Grpc.Net.Client;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -42,7 +42,7 @@ internal class UserService(
 
         if (user == null || !passwordHasher.VerifyPassword(dto.Password, user.Password))
         {
-            throw new UnauthorizedAccessException("Invalid email or password.");
+            throw new ExceptionWithStatusCode("Неправильный логин или пароль", HttpStatusCode.Unauthorized);
         }
         
         return GenerateJwtToken(user);
@@ -98,7 +98,9 @@ internal class UserService(
     public async Task RegisterAsync(RegisterUserDto dto, CancellationToken cancellationToken = default)
     {
         if (dto.Password != dto.RepeatedPassword)
-            throw new Exception("Пароли не совпадают");
+        {
+            throw new ExceptionWithStatusCode("Пароли не совпадают", HttpStatusCode.BadRequest);
+        }
 
         int code;
         do
@@ -107,29 +109,30 @@ internal class UserService(
         } while (await registrationCodesRepository.GetAsync(code, cancellationToken) is not null);
         
         logger.LogInformation($"Created code: {code}");
-        await registrationCodesRepository.CreateAsync(code, cancellationToken);
-        logger.LogInformation($"Code {code} was written in redis");
         
-        var title = "Регистрация в CorporateSystem";
-        var message = $"Ваш код подтверждения: {code}";
+        await registrationCodesRepository.CreateAsync(code, cancellationToken);
+        
+        logger.LogInformation($"Code {code} was written in redis");
         logger.LogInformation("Writing message to notification microservice");
+        
         await grpcNotificationClient.SendMessageAsync(new SendMessageRequest
         {
-            Title = title,
-            Message = message,
+            Title = "Регистрация в CorporateSystem",
+            Message = $"Ваш код подтверждения: {code}",
             ReceiverEmails = { dto.Email },
             Token = _notificationOptions.Token
         }, cancellationToken);
-        logger.LogInformation("Completed");
+        logger.LogInformation("Sending to notification is completed");
     }
 
     public async Task SuccessRegisterAsync(SuccessRegisterUserDto dto, CancellationToken cancellationToken = default)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(dto.Email);
-        ArgumentException.ThrowIfNullOrWhiteSpace(dto.Password);
+        dto.ShouldBeValid(logger);
 
         if (await registrationCodesRepository.GetAsync(dto.SuccessCode, cancellationToken) is null)
-            throw new Exception("Неверный код");
+        {
+            throw new ExceptionWithStatusCode("Неверный код", HttpStatusCode.BadRequest);
+        }
 
         await registrationCodesRepository.DeleteAsync(dto.SuccessCode, cancellationToken);
         
