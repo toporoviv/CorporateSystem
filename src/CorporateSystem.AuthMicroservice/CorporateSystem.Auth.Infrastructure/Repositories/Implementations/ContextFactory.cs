@@ -19,7 +19,10 @@ internal class ContextFactory(DbContextOptions<DataContext> options) : IContextF
             new TransactionOptions { IsolationLevel = isolationLevel },
             TransactionScopeAsyncFlowOption.Enabled);
 
-        return await action(context);
+        var result = await action(context);
+        scope.Complete();
+
+        return result;
     }
 
     public async Task ExecuteWithCommitAsync(

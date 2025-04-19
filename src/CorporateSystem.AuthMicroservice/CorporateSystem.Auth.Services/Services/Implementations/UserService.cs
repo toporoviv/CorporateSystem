@@ -28,7 +28,7 @@ internal class UserService(
     GrpcNotificationClient grpcNotificationClient,
     IOptions<JwtToken> jwtTokenOptions,
     IOptions<NotificationOptions> notificationOptions,
-    ILogger<UserService> logger) : IAuthService, IRegistrationService
+    ILogger<UserService> logger) : IAuthService, IRegistrationService, IUserService
 {
     private readonly JwtToken _jwtToken = jwtTokenOptions.Value;
     private readonly NotificationOptions _notificationOptions = notificationOptions.Value;
@@ -105,7 +105,7 @@ internal class UserService(
         int code;
         do
         {
-            code = Random.Shared.Next(1_000_00, 1_000_000);
+            code = Random.Shared.Next(100_000, 1_000_000);
         } while (await registrationCodesRepository.GetAsync(code, cancellationToken) is not null);
         
         logger.LogInformation($"Created code: {code}");
@@ -144,5 +144,27 @@ internal class UserService(
         };
 
         await userRepository.AddUserAsync(addUserDto, cancellationToken);
+    }
+
+    public Task<IEnumerable<User>> GetUsersByIdsAsync(int[] ids, CancellationToken cancellationToken = default)
+    {
+        return contextFactory.ExecuteWithoutCommitAsync(context =>
+        {
+            return Task.FromResult(context.Users
+                .Where(user => ids.Contains(user.Id))
+                .AsEnumerable());
+        }, cancellationToken: cancellationToken);
+    }
+
+    public Task<IEnumerable<User>> GetUsersByEmailsAsync(
+        string[] emails,
+        CancellationToken cancellationToken = default)
+    {
+        return contextFactory.ExecuteWithoutCommitAsync(context =>
+        {
+            return Task.FromResult(context.Users
+                .Where(user => emails.Contains(user.Email))
+                .AsEnumerable());
+        }, cancellationToken: cancellationToken);
     }
 }

@@ -118,6 +118,50 @@ public class AuthController(ILogger<AuthController> logger) : ControllerBase
             return StatusCode(StatusCodes.Status401Unauthorized, "Token validation failed.");
         }
     }
+
+    [HttpPost("get-user-emails-by-id")]
+    public async Task<IActionResult> GetUserEmailsById(
+        [FromBody] GetUserEmailsByIdsRequest request,
+        [FromServices] IUserService userService)
+    {
+        try
+        {
+            var users = await userService.GetUsersByIdsAsync(request.UserIds);
+            var emails = users.Select(user => user.Email).ToArray();
+
+            return Ok(new GetUserEmailsByIdsResponse
+            {
+                UserEmails = emails
+            });
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e.Message);
+            return StatusCode(StatusCodes.Status400BadRequest, "Что-то пошло не так");
+        }
+    }
+
+    [HttpPost("get-user-ids-by-email")]
+    public async Task<IActionResult> GetUserIdsByEmail(
+        [FromBody] GetUserIdsByEmailsRequest request,
+        [FromServices] IUserService userService)
+    {
+        try
+        {
+            var users = await userService.GetUsersByEmailsAsync(request.UserEmails);
+            var ids = users.Select(user => user.Id).ToArray();
+
+            return Ok(new GetUserIdsByEmailsResponse
+            {
+                UserIds = ids
+            });
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e.Message);
+            return StatusCode(StatusCodes.Status400BadRequest, "Что-то пошло не так");
+        }
+    }
     
     private UserInfo GetUserInfoByToken(string token)
     {
